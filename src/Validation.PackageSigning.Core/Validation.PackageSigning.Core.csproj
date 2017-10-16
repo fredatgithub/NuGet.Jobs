@@ -49,6 +49,8 @@
     <Compile Include="Storage\IValidatorStateService.cs" />
     <Compile Include="Messages\CertificateValidationMessage.cs" />
     <Compile Include="Messages\CertificateValidationMessageSerializer.cs" />
+    <Compile Include="Messages\SignatureValidationMessage.cs" />
+    <Compile Include="Messages\SignatureValidationMessageSerializer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Storage\SaveStatusResult.cs" />
     <Compile Include="Storage\ValidatorStateService.cs" />
