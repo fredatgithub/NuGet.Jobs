@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Data.Entity;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography.X509Certificates;
@@ -12,10 +13,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using NuGet.Jobs.Validation.Common;
-using NuGet.Jobs.Validation.PackageSigning.ExtractAndValidateSignature.Storage;
 using NuGet.Jobs.Validation.PackageSigning.Messages;
 using NuGet.Jobs.Validation.PackageSigning.Storage;
-using NuGet.Packaging;
+using NuGet.Jobs.Validation.PackageSigning.Validation;
+using NuGet.Packaging.Signing;
 using NuGet.Services.ServiceBus;
 using NuGet.Services.Validation;
 
@@ -35,8 +36,8 @@ namespace NuGet.Jobs.Validation.PackageSigning.ExtractAndValidateSignature
         private readonly IValidationEntitiesContext _validationContext;
         private readonly IValidatorStateService _validatorStateService;
         private readonly IPackageSigningStateService _packageSigningStateService;
-        private readonly ICertificateValidationService _certificateValidationService;
         private readonly ICertificateStore _certificateStore;
+        private readonly ISignatureValidator _signatureValidator;
         private readonly ILogger<SignatureValidationMessageHandler> _logger;
         private readonly int _maximumValidationFailures;
 
@@ -51,17 +52,15 @@ namespace NuGet.Jobs.Validation.PackageSigning.ExtractAndValidateSignature
             IValidatorStateService validatorStateService,
             IPackageSigningStateService packageSigningStateService,
             ICertificateStore certificateStore,
-            ICertificateValidationService certificateValidationService,
+            ISignatureValidator signatureValidator,
             ILogger<SignatureValidationMessageHandler> logger,
             int maximumValidationFailures = DefaultMaximumValidationFailures)
         {
-            //ISubscriptionProcessor<SignatureValidationMessage> subscriptionProcessor,
-            //_subscriptionProcessor = subscriptionProcessor ?? throw new ArgumentNullException(nameof(subscriptionProcessor));
             _validationContext = validationContext ?? throw new ArgumentNullException(nameof(validationContext));
             _validatorStateService = validatorStateService ?? throw new ArgumentNullException(nameof(validatorStateService));
             _packageSigningStateService = packageSigningStateService ?? throw new ArgumentNullException(nameof(packageSigningStateService));
-            _certificateValidationService = certificateValidationService ?? throw new ArgumentNullException(nameof(certificateValidationService));
             _certificateStore = certificateStore ?? throw new ArgumentNullException(nameof(certificateStore));
+            _signatureValidator = signatureValidator ?? throw new ArgumentNullException(nameof(signatureValidator));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             _maximumValidationFailures = maximumValidationFailures;
@@ -108,18 +107,18 @@ namespace NuGet.Jobs.Validation.PackageSigning.ExtractAndValidateSignature
             }
 
             // Validate package
-            using (var packageArchiveReader = await DownloadPackageAsync(message.NupkgUri))
+            using (var package = await DownloadPackageAsync(message.NupkgUri))
             {
                 // TODO: consume actual client nupkg's containing missing signing APIs
-                if (!await packageArchiveReader.IsSignedAsync(CancellationToken.None))
+                if (!await package.IsSignedAsync(CancellationToken.None))
                 {
                     return await HandleUnsignedPackageAsync(validation, message);
                 }
                 else
                 {
                     // TODO: extract signatures from nupkg
-                    var signatures = await packageArchiveReader.GetSignaturesAsync(CancellationToken.None);
-
+                    var signatures = await package.GetSignaturesAsync(CancellationToken.None);
+                    
                     // TODO: store extracted signatures
                     // ...
                     foreach (var signature in signatures)
@@ -127,23 +126,20 @@ namespace NuGet.Jobs.Validation.PackageSigning.ExtractAndValidateSignature
                         await _certificateStore.Save(signature);
                     }
 
-                    using (var signedPackage = new SignedPackageArchive(zip))
+                    var trustProviders = new[] { new SignatureVerificationProvider() };
+                    var signedPackageVerifier = new SignedPackageVerifier(trustProviders, SignedPackageVerifierSettings.RequireSigned);
+
+                    // TODO: verify signatures client-side
+                    var verifySignaturesResult = await signedPackageVerifier.VerifySignaturesAsync(package, _logger, CancellationToken.None);
+
+                    // TODO: handle client-side signature verification result
+                    if (!verifySignaturesResult.Valid)
                     {
-                        var trustProviders = new[] { new SignatureVerificationProvider() };
-                        var signedPackageVerifier = new SignedPackageVerifier(trustProviders, SignedPackageVerifierSettings.RequireSigned);
-
-                        // TODO: verify signatures client-side
-                        var verifySignaturesResult = await signedPackageVerifier.VerifySignaturesAsync(packageArchiveReader, _logger, CancellationToken.None);
-
-                        // TODO: handle client-side signature verification result
-                        if (!verifySignaturesResult.Valid)
-                        {
-                            return await HandleInvalidPackageSignatureAsync(validation, message);
-                        }
-                        else
-                        {
-                            return await HandleValidPackageSignatureAsync(validation, message, signatures);
-                        }
+                        return await HandleInvalidPackageSignatureAsync(validation, message);
+                    }
+                    else
+                    {
+                        return await HandleValidPackageSignatureAsync(validation, message, signatures);
                     }
                 }
             }
@@ -217,13 +213,13 @@ namespace NuGet.Jobs.Validation.PackageSigning.ExtractAndValidateSignature
             foreach (var signature in signatures)
             {
                 // TODO: get the end certificate used to create the signature
-                X509Certificate2 endCertificate;
+                X509Certificate2 endCertificate = null;
+
+                var validationResult = _signatureValidator.ValidateSignature(endCertificate);
 
                 // TODO:
                 // if either signature or timestamp authority certificates is expired AND this is not a revalidation
-                var certificateValidationResult = await _certificateValidationService.VerifyAsync(endCertificate);
-
-                if (!isRevalidation && certificateValidationResult != CertificateVerificationResult.Good)
+                if (!isRevalidation && !validationResult.IsValid)
                 {
                     //  UPDATE ValidatorStatuses SET State = Failed
                     validation.State = ValidationStatus.Failed;
@@ -234,13 +230,15 @@ namespace NuGet.Jobs.Validation.PackageSigning.ExtractAndValidateSignature
                 }
                 else
                 {
-                    PackageSignature packageSignature = await _validationContext.PackageSignatures.SingleOrDefaultAsync(ps => ps.PackageKey = message.)
+
+                    PackageSignature packageSignature = null; // await _validationContext.PackageSignatures.SingleOrDefaultAsync(ps => ps.PackageKey = message.)
                     if (packageSignature != null)
                     {
                         // This may happen in revalidation flow.
                         packageSignature.Status = PackageSignatureStatus.Unknown;
-
+                        //packageSignature.PackageSigningState
                         // TODO: SignedAt...
+
                     }
                     else
                     {
@@ -266,8 +264,8 @@ namespace NuGet.Jobs.Validation.PackageSigning.ExtractAndValidateSignature
             // Consume the message.
             return true;
         }
-
-        private async Task<PackageArchiveReader> DownloadPackageAsync(Uri nupkgUri)
+        
+        private async Task<SignedPackageArchive> DownloadPackageAsync(Uri nupkgUri)
         {
             Stream packageStream;
             using (var httpClient = new HttpClient())
@@ -280,8 +278,7 @@ namespace NuGet.Jobs.Validation.PackageSigning.ExtractAndValidateSignature
 
             packageStream.Position = 0;
 
-            return new PackageArchiveReader(packageStream);
+            return new SignedPackageArchive(new ZipArchive(packageStream));
         }
-
     }
 }

@@ -17,6 +17,8 @@ using NuGet.Services.KeyVault;
 using NuGet.Services.ServiceBus;
 using NuGet.Services.Validation;
 using System.Diagnostics;
+using NuGet.Jobs.Configuration;
+using NuGet.Jobs.Validation.PackageSigning.Validation;
 
 namespace NuGet.Jobs.Validation.PackageSigning.ExtractAndValidateSignature
 {
@@ -139,8 +141,7 @@ namespace NuGet.Jobs.Validation.PackageSigning.ExtractAndValidateSignature
             services.AddTransient<IPackageSigningStateService, PackageSigningStateService>();
 
             services.AddTransient<ICertificateStore, CertificateStore>();
-            services.AddTransient<ICertificateValidationService, CertificateValidationService>();
-            //services.AddTransient<IAlertingService, AlertingService>();
+            services.AddTransient<ISignatureValidator, SignatureValidator>();
         }
 
         private IServiceProvider GetServiceProvider(IConfigurationRoot configurationRoot)

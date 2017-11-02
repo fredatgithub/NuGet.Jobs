@@ -1,0 +1,2 @@
+﻿NuGet.Packaging.Core
+NuGet.Common

@@ -37,8 +37,26 @@
     <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
     <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Security" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="TODO\Extensions.cs" />
+    <Compile Include="TODO\HashAlgorithmName.cs" />
+    <Compile Include="TODO\ISignedPackage.cs" />
+    <Compile Include="TODO\ISignedPackageArchiveReader.cs" />
+    <Compile Include="TODO\KeyPairFileReader.cs" />
+    <Compile Include="TODO\KeyPairFileUtility.cs" />
+    <Compile Include="TODO\KeyPairFileWriter.cs" />
+    <Compile Include="TODO\PackageContentManifest.cs" />
+    <Compile Include="TODO\PackageContentManifestFileEntry.cs" />
+    <Compile Include="TODO\Signature.cs" />
+    <Compile Include="TODO\SignatureException.cs" />
+    <Compile Include="TODO\SignatureManifest.cs" />
+    <Compile Include="TODO\SignatureType.cs" />
+    <Compile Include="TODO\SignedPackageArchive.cs" />
+    <Compile Include="Validation\ISignatureValidator.cs" />
+    <Compile Include="Validation\SignatureValidator.cs" />
+    <Compile Include="Validation\SignatureValidationResult.cs" />
     <Compile Include="Storage\PackageSigningStateService.cs" />
     <Compile Include="Storage\SavePackageSigningStateResult.cs" />
     <Compile Include="Storage\IPackageSigningStateService.cs" />
@@ -87,30 +105,39 @@
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions">
       <Version>1.1.2</Version>
     </PackageReference>
+    <PackageReference Include="NuGet.Common">
+      <Version>4.6.0-preview1-4620</Version>
+    </PackageReference>
     <PackageReference Include="NuGet.Packaging">
-      <Version>4.6.0-preview1-4575</Version>
+      <Version>4.6.0-preview1-4620</Version>
+    </PackageReference>
+    <PackageReference Include="NuGet.Packaging.Core">
+      <Version>4.6.0-preview1-4620</Version>
     </PackageReference>
     <PackageReference Include="NuGet.Services.Configuration">
-      <Version>2.3.2-dev-16405</Version>
+      <Version>2.4.0</Version>
     </PackageReference>
     <PackageReference Include="NuGet.Services.Contracts">
-      <Version>2.3.2-dev-16405</Version>
+      <Version>2.4.0</Version>
     </PackageReference>
     <PackageReference Include="NuGet.Services.KeyVault">
-      <Version>2.3.2-dev-16405</Version>
+      <Version>2.4.0</Version>
     </PackageReference>
     <PackageReference Include="NuGet.Services.Logging">
-      <Version>2.3.2-dev-16405</Version>
+      <Version>2.4.0</Version>
     </PackageReference>
     <PackageReference Include="NuGet.Services.ServiceBus">
-      <Version>2.3.2-dev-16405</Version>
+      <Version>2.4.0</Version>
     </PackageReference>
     <PackageReference Include="NuGet.Services.Validation">
-      <Version>2.3.2-dev-16405</Version>
+      <Version>2.4.0</Version>
     </PackageReference>
     <PackageReference Include="WindowsAzure.Storage">
       <Version>8.5.0</Version>
     </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="TODO\DependenciesToRemove.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
